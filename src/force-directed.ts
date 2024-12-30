@@ -225,6 +225,11 @@ const vis: ForceDirectedGraphVisualization = {
 
   // Set up the initial state of the visualization
   create(element, config) {
+    element.innerHTML = `
+    <head>
+    <link href='https://fonts.googleapis.com/css2?family=Google+Sans:wght@100;200;300;400;500;700;900&display=swap' rel='stylesheet'>
+    </head>
+  `;
     element.style.fontFamily = `"Open Sans", "Helvetica", sans-serif`;
     this.svg = d3.select(element).append("svg");
   },
@@ -412,13 +417,30 @@ const vis: ForceDirectedGraphVisualization = {
     var manybody = d3.forceManyBody();
     //manybody.strength(-7)
 
+    var func = {
+      sqrt: (d) => Math.sqrt(d),
+      cbrt: (d) => Math.cbrt(d),
+      log2: (d) => Math.log2(d),
+      log10: (d) => Math.log10(d),
+    };
+
+    const getNodeWeight = (label) => {
+      const edges = links.filter(
+        (link) => link.source.id === label || link.target.id === label
+      );
+      return edges.length ?? 1;
+    };
+
     const simulation = d3
       .forceSimulation(nodes)
       .force(
         "link",
         d3
           .forceLink(links)
-          .distance(linkDistance)
+          .distance((d) => {
+            const weight = func[config.edge_weight](d.value);
+            return linkDistance * weight;
+          })
           .id((d) => (d as any).id)
       )
       .force("charge", manybody)
@@ -438,12 +460,6 @@ const vis: ForceDirectedGraphVisualization = {
       .attr("target", (d) => d.target.id)
       .attr("source", (d) => d.source.id)
       .attr("stroke-width", (d) => {
-        var func = {
-          sqrt: (d) => Math.sqrt(d),
-          cbrt: (d) => Math.cbrt(d),
-          log2: (d) => Math.log2(d),
-          log10: (d) => Math.log10(d),
-        };
         if (measure) {
           return func[config.edge_weight](d.value);
         }
@@ -474,28 +490,14 @@ const vis: ForceDirectedGraphVisualization = {
       .attr("class", "node")
       .call(drag(simulation));
 
-    const getWeight = (value) => {
-      const destinationDimension = config[NODE_2];
-      const destinationValues = data.map(
-        (data) => data[destinationDimension].value
-      );
-      const count = destinationValues.reduce(
-        (count, destination) => (destination === value ? count + 1 : count),
-        0
-      );
-      return count / destinationValues.length;
-    };
-
     node
       .append("circle")
       .attr("stroke", "#fff")
       .attr("stroke-width", 1)
       .attr("id", (d) => d.id)
       .attr("r", (d) => {
-        const ratio = getWeight(d.id);
-        console.log(`ratio for ${d.id}: ${ratio}`);
-        console.log(`added radius for ${d.id}: ${radius * ratio}`);
-        return radius + radius * ratio;
+        const weight = getNodeWeight(d.id);
+        return radius * weight;
       })
       .attr("fill", (d) => color(d.group))
       .on("mouseover", function (d) {
