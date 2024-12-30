@@ -232,6 +232,7 @@ const vis: ForceDirectedGraphVisualization = {
   `;
     element.style.fontFamily = `"Open Sans", "Helvetica", sans-serif`;
     this.svg = d3.select(element).append("svg");
+    this.svg.style("padding", "80px");
   },
   // Render in response to the data or settings changing
   updateAsync(data, element, config, queryResponse, details, done) {
