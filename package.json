@@ -5,8 +5,8 @@
   "author": "Josh Rosen <josh@hashpath.com>",
   "private": true,
   "scripts": {
-    "build": "webpack --config webpack.config.js",
-    "watch": "webpack --config webpack.config.js --watch --progress",
+    "build": "NODE_OPTIONS=--openssl-legacy-provider webpack --config webpack.config.js",
+    "watch": "NODE_OPTIONS=--openssl-legacy-provider webpack --config webpack.config.js --watch --progress",
     "lint": "tslint --project tsconfig.json --format stylish 'src/**/*.ts'",
     "lint-fix": "tslint --fix --project tsconfig.json  --format stylish 'src/**/*.ts'"
   },
@@ -28,5 +28,6 @@
     "d3-svg-legend": "^2.25.6",
     "lodash.isequal": "^4.5.0",
     "ssf": "^0.11.2"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
