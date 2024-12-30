@@ -114,6 +114,26 @@ const vis: ForceDirectedGraphVisualization = {
       label: "Labels -----------------------------------------",
       order: 90,
     },
+    font_family: {
+      section: "Labels",
+      order: 91,
+      type: "string",
+      display: "select",
+      display_size: "half",
+      label: "Font family",
+      values: [
+        { Looker: '"Google Sans"' },
+        {
+          Helvetica:
+            'BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif',
+        },
+        {
+          "Times New Roman":
+            'Roboto, "Noto Sans", "Noto Sans JP", "Noto Sans CJK KR", "Noto Sans Arabic UI", "Noto Sans Devanagari UI", "Noto Sans Hebrew", "Noto Sans Thai UI", Helvetica, Arial, sans-serif',
+        },
+      ],
+      default: '"Google Sans"',
+    },
     font_color: {
       section: "Labels",
       type: "string",
@@ -121,7 +141,7 @@ const vis: ForceDirectedGraphVisualization = {
       display_size: "half",
       label: "Label Color",
       default: "#000000",
-      order: 91,
+      order: 92,
     },
     labels: {
       section: "Labels",
@@ -136,7 +156,7 @@ const vis: ForceDirectedGraphVisualization = {
         { "On Hover": "on_hover" },
       ],
       display_size: "half",
-      order: 92,
+      order: 93,
       default: "all",
     },
     labelTypes: {
@@ -145,7 +165,7 @@ const vis: ForceDirectedGraphVisualization = {
       label: "Filter Node Labels",
       placeholder: 'List of values from "Source"/"Target" groups',
       default: "",
-      order: 93,
+      order: 94,
     },
     font_weight: {
       section: "Labels",
@@ -155,7 +175,7 @@ const vis: ForceDirectedGraphVisualization = {
       display_size: "half",
       values: [{ Normal: "normal" }, { Bold: "bold" }],
       default: "normal",
-      order: 94,
+      order: 95,
     },
     font_size: {
       section: "Labels",
@@ -163,7 +183,7 @@ const vis: ForceDirectedGraphVisualization = {
       label: "Label Font Size",
       display_size: "half",
       default: ["10"],
-      order: 95,
+      order: 96,
     },
 
     tooltipDivider: {
@@ -215,8 +235,8 @@ const vis: ForceDirectedGraphVisualization = {
       !handleErrors(this, queryResponse, {
         min_pivots: 0,
         max_pivots: 0,
-        min_dimensions: 4,
-        max_dimensions: 4,
+        min_dimensions: 2,
+        max_dimensions: 32,
         min_measures: 0,
         max_measures: 1,
       })
@@ -231,7 +251,6 @@ const vis: ForceDirectedGraphVisualization = {
         }
       }
     };
-
 
     if (config.color_range === undefined) {
       applyDefualtConfig();
@@ -249,11 +268,11 @@ const vis: ForceDirectedGraphVisualization = {
     const GROUP_2 = "Group_2";
     const SOURCE = "SOURCE";
     const TARGET = "TARGET";
-    let graphOptions = [NODE_1, GROUP_1, NODE_2, GROUP_2];
+    let graphOptions = [NODE_1, NODE_2, GROUP_1, GROUP_2];
     let labels = [
       "Source nodes",
-      "Source groups",
       "Target nodes",
+      "Source groups",
       "Target groups",
     ];
 
@@ -265,14 +284,16 @@ const vis: ForceDirectedGraphVisualization = {
       graphOptions.forEach((g, i) => {
         newOptions[g] = {
           section: "Graph",
-          label: labels[i],
+          label: labels[i % dimensions.length],
           type: "string",
           display: "select",
           display_size: "half",
           values: selections,
           order: 10 + i,
-          default: dimensions[i].name,
+          default: dimensions[i % dimensions.length].name,
         };
+        // TODO: remove this
+        config[g] = dimensions[i % dimensions.length].name;
       });
       this.trigger("registerOptions", newOptions);
     };
@@ -453,12 +474,29 @@ const vis: ForceDirectedGraphVisualization = {
       .attr("class", "node")
       .call(drag(simulation));
 
-    var circle = node
+    const getWeight = (value) => {
+      const destinationDimension = config[NODE_2];
+      const destinationValues = data.map(
+        (data) => data[destinationDimension].value
+      );
+      const count = destinationValues.reduce(
+        (count, destination) => (destination === value ? count + 1 : count),
+        0
+      );
+      return count / destinationValues.length;
+    };
+
+    node
       .append("circle")
       .attr("stroke", "#fff")
       .attr("stroke-width", 1)
       .attr("id", (d) => d.id)
-      .attr("r", radius)
+      .attr("r", (d) => {
+        const ratio = getWeight(d.id);
+        console.log(`ratio for ${d.id}: ${ratio}`);
+        console.log(`added radius for ${d.id}: ${radius * ratio}`);
+        return radius + radius * ratio;
+      })
       .attr("fill", (d) => color(d.group))
       .on("mouseover", function (d) {
         d3.select(this).attr("stroke-width", 1.5).attr("stroke", "#FFA500");
@@ -502,6 +540,7 @@ const vis: ForceDirectedGraphVisualization = {
         .attr("y", -1 * config.circle_radius - 3 + "px")
         .style("text-anchor", "middle")
         .style("font-weight", config.font_weight)
+        .style("font-family", config.font_family)
         .text(function (d) {
           if (labelTypes.indexOf(d.group) > -1) {
             return d.id;
