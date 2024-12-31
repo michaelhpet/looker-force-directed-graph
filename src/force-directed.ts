@@ -1,5 +1,4 @@
 import * as d3 from "d3";
-import isEqual from "lodash.isequal";
 import { handleErrors } from "./utils";
 import {
   nodeTooltip,
@@ -224,7 +223,7 @@ const vis: ForceDirectedGraphVisualization = {
   },
 
   // Set up the initial state of the visualization
-  create(element, config) {
+  create(element) {
     element.innerHTML = `
     <head>
     <link href='https://fonts.googleapis.com/css2?family=Google+Sans:wght@100;200;300;400;500;700;900&display=swap' rel='stylesheet'>
@@ -232,10 +231,10 @@ const vis: ForceDirectedGraphVisualization = {
   `;
     element.style.fontFamily = `"Open Sans", "Helvetica", sans-serif`;
     this.svg = d3.select(element).append("svg");
-    this.svg.style("padding", "80px");
   },
   // Render in response to the data or settings changing
   updateAsync(data, element, config, queryResponse, details, done) {
+    console.log("debug", { data, element, config, queryResponse });
     this.clearErrors();
     if (
       !handleErrors(this, queryResponse, {
@@ -268,26 +267,21 @@ const vis: ForceDirectedGraphVisualization = {
       initTooltip(config.tooltipFont);
     }
 
-    const NODE_1 = "Node_1";
-    const NODE_2 = "Node_2";
-    const GROUP_1 = "Group_1";
-    const GROUP_2 = "Group_2";
+    const SOURCE_NODE = "SOURCE_NODE";
+    const TARGET_NODE = "TARGET_NODE";
+    const SOURCE_GROUP = "SOURCE_GROUP";
+    const TARGET_GROUP = "TARGET_GROUP";
     const SOURCE = "SOURCE";
     const TARGET = "TARGET";
-    let graphOptions = [NODE_1, NODE_2, GROUP_1, GROUP_2];
-    let labels = [
-      "Source nodes",
-      "Target nodes",
-      "Source groups",
-      "Target groups",
-    ];
+    let graphOptions = [SOURCE_NODE, TARGET_NODE, SOURCE_GROUP, TARGET_GROUP];
+    let labels = ["Source node", "Target node", "Source group", "Target group"];
 
     const generateOptions = (dimensions) => {
       let newOptions = Object.assign({}, this.options);
       let selections = dimensions.map((d) => ({
         [d.label_short || d.label]: d.name,
       }));
-      graphOptions.forEach((g, i) => {
+      graphOptions.slice(0, dimensions.length).forEach((g, i) => {
         newOptions[g] = {
           section: "Graph",
           label: labels[i % dimensions.length],
@@ -299,7 +293,7 @@ const vis: ForceDirectedGraphVisualization = {
           default: dimensions[i % dimensions.length].name,
         };
         // TODO: remove this
-        config[g] = dimensions[i % dimensions.length].name;
+        // config[g] = dimensions[i % dimensions.length].name;
       });
       this.trigger("registerOptions", newOptions);
     };
@@ -314,7 +308,7 @@ const vis: ForceDirectedGraphVisualization = {
       measure?.value_format || config?.tooltipValFormat || "#,###";
 
     generateOptions(dimensions);
-    if (config.NODE_1 === undefined || config.NODE_1 === "") {
+    if (config[SOURCE_NODE] === undefined || config[SOURCE_NODE] === "") {
       generateOptions(dimensions);
     }
 
@@ -360,39 +354,39 @@ const vis: ForceDirectedGraphVisualization = {
     // First make the nodes array
     data.forEach((row: Row) => {
       if (
-        row[config[NODE_1]] === undefined ||
-        row[config[NODE_2]] === undefined ||
-        row[config[NODE_1]]?.value === null ||
-        row[config[NODE_2]]?.value === null
+        row[config[SOURCE_NODE]] === undefined ||
+        row[config[TARGET_NODE]] === undefined ||
+        row[config[SOURCE_NODE]]?.value === null ||
+        row[config[TARGET_NODE]]?.value === null
       ) {
         return;
       }
-      if (nodes_unique.indexOf(row[config[NODE_1]].value) == -1) {
-        nodes_unique.push(row[config[NODE_1]].value);
-        if (groups_unique.indexOf(row[config[GROUP_1]].value) == -1) {
-          groups_unique.push(row[config[GROUP_1]].value);
+      if (nodes_unique.indexOf(row[config[SOURCE_NODE]].value) == -1) {
+        nodes_unique.push(row[config[SOURCE_NODE]].value);
+        if (groups_unique.indexOf(row[config[SOURCE_GROUP]].value) == -1) {
+          groups_unique.push(row[config[SOURCE_GROUP]].value);
         }
-        let nodeDim = dimensions.find((e) => e.name === config[NODE_1]);
-        let groupDim = dimensions.find((e) => e.name === config[GROUP_1]);
+        let nodeDim = dimensions.find((e) => e.name === config[SOURCE_NODE]);
+        let groupDim = dimensions.find((e) => e.name === config[SOURCE_GROUP]);
         const newnode = {
-          id: row[config[NODE_1]].value,
-          group: row[config[GROUP_1]].value,
+          id: row[config[SOURCE_NODE]].value,
+          group: row[config[SOURCE_GROUP]].value,
           groupType: SOURCE,
           nodeField: nodeDim.label_short || nodeDim.short,
           groupField: groupDim.label_short || groupDim.short,
         };
         nodes.push(newnode);
       }
-      if (nodes_unique.indexOf(row[config[NODE_2]].value) == -1) {
-        nodes_unique.push(row[config[NODE_2]].value);
-        if (groups_unique.indexOf(row[config[GROUP_2]].value) == -1) {
-          groups_unique.push(row[config[GROUP_2]].value);
+      if (nodes_unique.indexOf(row[config[TARGET_NODE]].value) == -1) {
+        nodes_unique.push(row[config[TARGET_NODE]].value);
+        if (groups_unique.indexOf(row[config[TARGET_GROUP]].value) == -1) {
+          groups_unique.push(row[config[TARGET_GROUP]].value);
         }
-        let nodeDim = dimensions.find((e) => e.name === config[NODE_2]);
-        let groupDim = dimensions.find((e) => e.name === config[GROUP_2]);
+        let nodeDim = dimensions.find((e) => e.name === config[TARGET_NODE]);
+        let groupDim = dimensions.find((e) => e.name === config[TARGET_GROUP]);
         const newnode = {
-          id: row[config[NODE_2]].value,
-          group: row[config[GROUP_2]].value,
+          id: row[config[TARGET_NODE]].value,
+          group: row[config[TARGET_GROUP]].value,
           groupType: TARGET,
           nodeField: nodeDim.label_short || nodeDim.label,
           groupField: groupDim.label_short || nodeDim.label,
@@ -400,8 +394,8 @@ const vis: ForceDirectedGraphVisualization = {
         nodes.push(newnode);
       }
       const newlink = {
-        source: row[config[NODE_1]].value,
-        target: row[config[NODE_2]].value,
+        source: row[config[SOURCE_NODE]].value,
+        target: row[config[TARGET_NODE]].value,
         value: measure ? row[measure.name].value : 1,
       };
       links.push(newlink);
@@ -425,11 +419,14 @@ const vis: ForceDirectedGraphVisualization = {
       log10: (d) => Math.log10(d),
     };
 
+    let highestNodeWeight = 1;
     const getNodeWeight = (label) => {
       const edges = links.filter(
         (link) => link.source.id === label || link.target.id === label
       );
-      return edges.length ?? 1;
+      const weight = edges.length ?? 1;
+      if (weight > highestNodeWeight) highestNodeWeight = weight;
+      return weight;
     };
 
     const simulation = d3
@@ -440,7 +437,7 @@ const vis: ForceDirectedGraphVisualization = {
           .forceLink(links)
           .distance((d) => {
             const weight = func[config.edge_weight](d.value);
-            return linkDistance * weight;
+            return linkDistance * weight - highestNodeWeight;
           })
           .id((d) => (d as any).id)
       )
@@ -560,6 +557,7 @@ const vis: ForceDirectedGraphVisualization = {
         .attr("y", -1 * config.circle_radius - 3 + "px")
         .style("text-anchor", "middle")
         .style("font-weight", config.font_weight)
+        .style("font-family", config.font_family)
         .text(function (d) {
           if (config.labels === "all" || config.labels === "on_hover") {
             return d.id;
@@ -583,53 +581,39 @@ const vis: ForceDirectedGraphVisualization = {
       d3.selectAll("text").attr("opacity", 0);
     }
 
+    const margin = radius * highestNodeWeight;
     simulation.on("tick", () => {
       link
         .attr("x1", (d) => {
-          if (isNaN(d.source.x)) {
-            return 0;
-          } else {
-            return d.source.x;
-          }
+          const sourceX = isNaN(d.source.x)
+            ? width / 2
+            : Math.max(margin, Math.min(width - margin, d.source.x));
+          return sourceX;
         })
         .attr("y1", (d) => {
-          if (isNaN(d.source.y)) {
-            return 0;
-          } else {
-            return d.source.y;
-          }
+          const sourceY = isNaN(d.source.y)
+            ? height / 2
+            : Math.max(margin, Math.min(height - margin, d.source.y));
+          return sourceY;
         })
         .attr("x2", (d) => {
-          if (isNaN(d.target.x)) {
-            return 0;
-          } else {
-            return d.target.x;
-          }
+          const targetX = isNaN(d.target.x)
+            ? width / 2
+            : Math.max(margin, Math.min(width - margin, d.target.x));
+          return targetX;
         })
         .attr("y2", (d) => {
-          if (isNaN(d.target.y)) {
-            return 0;
-          } else {
-            return d.target.y;
-          }
+          const targetY = isNaN(d.target.y)
+            ? height / 2
+            : Math.max(margin, Math.min(height - margin, d.target.y));
+          return targetY;
         });
 
-      node
-        .attr(
-          "cx",
-          (d) => (d.x = Math.max(radius, Math.min(width - radius, d.x)))
-        )
-        .attr(
-          "cy",
-          (d) => (d.y = Math.max(radius, Math.min(height - radius, d.y)))
-        )
-        .attr("transform", function (d) {
-          if (isNaN(d.x)) {
-            return "";
-          } else {
-            return "translate(" + d.x + "," + d.y + ")";
-          }
-        });
+      node.attr("transform", function (d) {
+        d.x = Math.max(margin, Math.min(width - margin, d.x));
+        d.y = Math.max(margin, Math.min(height - margin, d.y));
+        return `translate(${d.x},${d.y})`;
+      });
     });
     done();
   },
