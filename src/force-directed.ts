@@ -567,18 +567,7 @@ const vis: ForceDirectedGraphVisualization = {
         }
       })
       .on("click", function (d) {
-        let nodeLinks: any[] = [
-          {
-            label: `View Details for ${d.id}`,
-            url: `/explore/model_name/view_name?fields=field_name&filter[field_name]=${d.id}`,
-            type: "drill",
-          },
-          {
-            label: "External Link",
-            url: "https://example.com",
-            type: "drill",
-          },
-        ];
+        let nodeLinks: any[] = [];
         for (const node of data) {
           if (
             node[config[SOURCE_NODE]].value === d.id ||
@@ -595,18 +584,7 @@ const vis: ForceDirectedGraphVisualization = {
       .on("contextmenu", function (d) {
         if (!details.crossfilterEnabled) return;
         d3.event.preventDefault();
-        let nodeLinks: any[] = [
-          {
-            label: `View Details for ${d.id}`,
-            url: `/explore/model_name/view_name?fields=field_name&filter[field_name]=${d.id}`,
-            type: "drill",
-          },
-          {
-            label: "External Link",
-            url: "https://example.com",
-            type: "drill",
-          },
-        ];
+        let nodeLinks: any[] = [];
         for (const node of data) {
           if (
             node[config[SOURCE_NODE]].value === d.id ||
