@@ -13,6 +13,7 @@ import { Row, Looker, VisualizationDefinition } from "./types";
 
 // Global values provided via the API
 declare var looker: Looker;
+declare var LookerCharts: any;
 
 interface ForceDirectedGraphVisualization extends VisualizationDefinition {
   svg?: any;
@@ -281,10 +282,10 @@ const vis: ForceDirectedGraphVisualization = {
       let selections = dimensions.map((d) => ({
         [d.label_short || d.label]: d.name,
       }));
-      graphOptions.slice(0, dimensions.length).forEach((g, i) => {
+      graphOptions.forEach((g, i) => {
         newOptions[g] = {
           section: "Graph",
-          label: labels[i % dimensions.length],
+          label: labels[i],
           type: "string",
           display: "select",
           display_size: "half",
@@ -293,7 +294,7 @@ const vis: ForceDirectedGraphVisualization = {
           default: dimensions[i % dimensions.length].name,
         };
         // TODO: remove this
-        // config[g] = dimensions[i % dimensions.length].name;
+        config[g] = dimensions[i % dimensions.length].name;
       });
       this.trigger("registerOptions", newOptions);
     };
@@ -444,6 +445,40 @@ const vis: ForceDirectedGraphVisualization = {
       .force("charge", manybody)
       .force("center", d3.forceCenter(width / 2, height / 2));
 
+    const toggleCrossfilter = (event, index) => {
+      const pageX = event.pageX ?? event.native.pageX;
+      const pageY = event.pageY ?? event.native.pageY;
+      LookerCharts.Utils.toggleCrossfilter({
+        row: data[index],
+        event: { pageX, pageY },
+      });
+    };
+
+    const openDrillMenu = (event, links) => {
+      const pageX = event.pageX ?? event.native.pageX;
+      const pageY = event.pageY ?? event.native.pageY;
+      LookerCharts.Utils.openDrillMenu({
+        event: { pageX, pageY },
+        links,
+      });
+    };
+
+    const closeDrillMenu = () => {
+      LookerCharts.Utils.openDrillMenu({
+        event: {
+          pageX: Number.MAX_SAFE_INTEGER,
+          pageY: Number.MAX_SAFE_INTEGER,
+        },
+        links: [
+          {
+            label: "Open in new tab",
+            type: "url",
+            url: window.location.href,
+          },
+        ],
+      });
+    };
+
     const svg = this.svg!.attr("width", "100%").attr("height", height);
 
     const link = svg
@@ -477,7 +512,16 @@ const vis: ForceDirectedGraphVisualization = {
       .on("mouseleave", function () {
         d3.select(this).attr("stroke", config.link_color);
         hideTooltip();
+      })
+      .on("click", function () {
+        const target = d3.event.target;
+        if (target.tagName !== "circle") closeDrillMenu();
       });
+
+    element.onclick = function (event: any) {
+      if (event.target.nodeName !== "circle") closeDrillMenu();
+    };
+
     var node = svg
       .append("g")
       .attr("class", "nodes")
@@ -524,6 +568,59 @@ const vis: ForceDirectedGraphVisualization = {
         if (config.highlight_selection || config.labels === "on_hover") {
           clearHighlight(config.labels === "on_hover");
         }
+      })
+      .on("click", function (d) {
+        let nodeLinks: any[] = [
+          {
+            label: `View Details for ${d.id}`,
+            url: `/explore/model_name/view_name?fields=field_name&filter[field_name]=${d.id}`,
+            type: "drill",
+          },
+          {
+            label: "External Link",
+            url: "https://example.com",
+            type: "drill",
+          },
+        ];
+        for (const node of data) {
+          if (
+            node[config[SOURCE_NODE]].value === d.id ||
+            node[config[TARGET_NODE]].value === d.id
+          )
+            nodeLinks = nodeLinks.concat(
+              node[config[SOURCE_NODE]].links ?? [],
+              node[config[TARGET_NODE]].links ?? []
+            );
+        }
+        if (details.crossfilterEnabled) toggleCrossfilter(d3.event, d.index);
+        else openDrillMenu(d3.event, nodeLinks);
+      })
+      .on("contextmenu", function (d) {
+        if (!details.crossfilterEnabled) return;
+        d3.event.preventDefault();
+        let nodeLinks: any[] = [
+          {
+            label: `View Details for ${d.id}`,
+            url: `/explore/model_name/view_name?fields=field_name&filter[field_name]=${d.id}`,
+            type: "drill",
+          },
+          {
+            label: "External Link",
+            url: "https://example.com",
+            type: "drill",
+          },
+        ];
+        for (const node of data) {
+          if (
+            node[config[SOURCE_NODE]].value === d.id ||
+            node[config[TARGET_NODE]].value === d.id
+          )
+            nodeLinks = nodeLinks.concat(
+              node[config[SOURCE_NODE]].links ?? [],
+              node[config[TARGET_NODE]].links ?? []
+            );
+        }
+        openDrillMenu(d3.event, nodeLinks);
       });
 
     var labelTypes = [];

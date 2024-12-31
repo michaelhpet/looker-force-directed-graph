@@ -118,6 +118,7 @@ export interface VisUpdateDetails {
     size?: boolean;
   };
   print?: boolean;
+  crossfilterEnabled?: boolean;
 }
 
 export interface VisOption {
