@@ -235,7 +235,6 @@ const vis: ForceDirectedGraphVisualization = {
   },
   // Render in response to the data or settings changing
   updateAsync(data, element, config, queryResponse, details, done) {
-    console.log("debug", { data, element, config, queryResponse });
     this.clearErrors();
     if (
       !handleErrors(this, queryResponse, {
@@ -293,8 +292,6 @@ const vis: ForceDirectedGraphVisualization = {
           order: 10 + i,
           default: dimensions[i % dimensions.length].name,
         };
-        // TODO: remove this
-        config[g] = dimensions[i % dimensions.length].name;
       });
       this.trigger("registerOptions", newOptions);
     };
