@@ -241,7 +241,7 @@ const vis: ForceDirectedGraphVisualization = {
         min_pivots: 0,
         max_pivots: 0,
         min_dimensions: 2,
-        max_dimensions: 32,
+        max_dimensions: 4,
         min_measures: 0,
         max_measures: 1,
       })
