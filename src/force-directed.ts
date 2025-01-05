@@ -26,35 +26,14 @@ const vis: ForceDirectedGraphVisualization = {
     nodeDivider: {
       section: "Graph",
       type: "string",
-      label: "Nodes -----------------------------------------",
+      label: "Nodes ----------------------------------------",
       display: "divider",
       order: 8,
-    },
-    color_range: {
-      type: "array",
-      section: "Graph",
-      label: "Node Color Range",
-      display: "colors",
-      display_size: "half",
-      default: [
-        "#1f77b4",
-        "#ff7f0e",
-        "#2ca02c",
-        "#d62728",
-        "#9467bd",
-        "#8c564b",
-        "#e377c2",
-        "#7f7f7f",
-        "#bcbd22",
-        "#17becf",
-      ],
-      order: 9,
     },
     circle_radius: {
       section: "Graph",
       type: "number",
       display: "range",
-      display_size: "half",
       label: "Circle Radius",
       min: 1,
       max: 40,
@@ -70,26 +49,16 @@ const vis: ForceDirectedGraphVisualization = {
       display: "divider",
       order: 19,
     },
-    link_color: {
-      section: "Graph",
-      type: "string",
-      display: "color",
-      display_size: "half",
-      label: "Link Color",
-      default: "#000000",
-      order: 20,
-    },
     linkDistance: {
       section: "Graph",
       type: "number",
       display: "range",
-      display_size: "half",
       label: "Link Distance",
       default: 30,
       min: 5,
       max: 300,
       step: 5,
-      order: 21,
+      order: 20,
     },
     edge_weight: {
       type: "string",
@@ -104,7 +73,23 @@ const vis: ForceDirectedGraphVisualization = {
         { log10: "log10" },
       ],
       default: "sqrt",
+      order: 21,
+    },
+    link_color: {
+      section: "Graph",
+      type: "string",
+      display: "color",
+      display_size: "half",
+      label: "Link Color",
+      default: "#000000",
       order: 22,
+    },
+    colorsDivider: {
+      section: "Graph",
+      type: "string",
+      label: "Group colors -----------------------------------",
+      display: "divider",
+      order: 23,
     },
 
     labelDivider: {
@@ -119,7 +104,6 @@ const vis: ForceDirectedGraphVisualization = {
       order: 91,
       type: "string",
       display: "select",
-      display_size: "half",
       label: "Font family",
       values: [
         { Looker: '"Google Sans"' },
@@ -157,7 +141,7 @@ const vis: ForceDirectedGraphVisualization = {
       ],
       display_size: "half",
       order: 93,
-      default: "all",
+      default: "none",
     },
     labelTypes: {
       section: "Labels",
@@ -240,7 +224,7 @@ const vis: ForceDirectedGraphVisualization = {
       !handleErrors(this, queryResponse, {
         min_pivots: 0,
         max_pivots: 0,
-        min_dimensions: 2,
+        min_dimensions: 4,
         max_dimensions: 4,
         min_measures: 0,
         max_measures: 1,
@@ -273,10 +257,27 @@ const vis: ForceDirectedGraphVisualization = {
     const TARGET_GROUP = "TARGET_GROUP";
     const SOURCE = "SOURCE";
     const TARGET = "TARGET";
-    let graphOptions = [SOURCE_NODE, TARGET_NODE, SOURCE_GROUP, TARGET_GROUP];
-    let labels = ["Source node", "Target node", "Source group", "Target group"];
+    let graphOptions = [SOURCE_NODE, SOURCE_GROUP, TARGET_NODE, TARGET_GROUP];
+    let labels = [
+      "Source nodes",
+      "Source groups",
+      "Target nodes",
+      "Target groups",
+    ];
 
-    const generateOptions = (dimensions) => {
+    const DEAFULT_COLORS = [
+      "#1f77b4",
+      "#ff7f0e",
+      "#2ca02c",
+      "#d62728",
+      "#9467bd",
+      "#8c564b",
+      "#e377c2",
+      "#7f7f7f",
+      "#bcbd22",
+      "#17becf",
+    ];
+    const generateOptions = (dimensions, groups) => {
       let newOptions = Object.assign({}, this.options);
       let selections = dimensions.map((d) => ({
         [d.label_short || d.label]: d.name,
@@ -290,14 +291,26 @@ const vis: ForceDirectedGraphVisualization = {
           display_size: "half",
           values: selections,
           order: 10 + i,
-          default: dimensions[i % dimensions.length].name,
+          default: dimensions[i].name,
         };
+        // TODO: remove this
+        // config[g] = newOptions[g].default;
+      });
+      groups.forEach((group, i) => {
+        newOptions[`color_${group}`] = {
+          section: "Graph",
+          label: group,
+          type: "string",
+          display: "color",
+          display_size: "half",
+          default: DEAFULT_COLORS[i % groups.length],
+        };
+        // TODO: remove this
+        // config[`color_${group}`] = newOptions[`color_${group}`].default;
       });
       this.trigger("registerOptions", newOptions);
     };
 
-    const height = element.clientHeight + 20;
-    const width = element.clientWidth;
     const radius = config.circle_radius;
     const linkDistance = config.linkDistance;
     const dimensions = queryResponse.fields.dimension_like;
@@ -305,9 +318,23 @@ const vis: ForceDirectedGraphVisualization = {
     const valFormat =
       measure?.value_format || config?.tooltipValFormat || "#,###";
 
-    generateOptions(dimensions);
-    if (config[SOURCE_NODE] === undefined || config[SOURCE_NODE] === "") {
-      generateOptions(dimensions);
+    const groups_unique = new Set();
+    data.forEach((row) => {
+      if (row[config[SOURCE_GROUP]]) {
+        groups_unique.add(row[config[SOURCE_GROUP]].value);
+      }
+      if (row[config[TARGET_GROUP]]) {
+        groups_unique.add(row[config[TARGET_GROUP]].value);
+      }
+    });
+
+    generateOptions(dimensions, Array.from(groups_unique));
+    if (
+      config[SOURCE_NODE] === undefined ||
+      config[SOURCE_NODE] === "" ||
+      !config[`color_${Array.from(groups_unique)[0]}`]
+    ) {
+      generateOptions(dimensions, Array.from(groups_unique));
     }
 
     let isDragging = false;
@@ -338,18 +365,10 @@ const vis: ForceDirectedGraphVisualization = {
         .on("end", dragended);
     };
 
-    const colorScale = d3.scaleOrdinal();
-    var color = colorScale.range(d3.schemeCategory10);
-    if (config.color_range != null) {
-      color = colorScale.range(config.color_range);
-    }
-
     var nodes_unique = [];
-    var groups_unique = [];
     var nodes = [];
     var links = [];
 
-    // First make the nodes array
     data.forEach((row: Row) => {
       if (
         row[config[SOURCE_NODE]] === undefined ||
@@ -361,9 +380,6 @@ const vis: ForceDirectedGraphVisualization = {
       }
       if (nodes_unique.indexOf(row[config[SOURCE_NODE]].value) == -1) {
         nodes_unique.push(row[config[SOURCE_NODE]].value);
-        if (groups_unique.indexOf(row[config[SOURCE_GROUP]].value) == -1) {
-          groups_unique.push(row[config[SOURCE_GROUP]].value);
-        }
         let nodeDim = dimensions.find((e) => e.name === config[SOURCE_NODE]);
         let groupDim = dimensions.find((e) => e.name === config[SOURCE_GROUP]);
         const newnode = {
@@ -377,9 +393,6 @@ const vis: ForceDirectedGraphVisualization = {
       }
       if (nodes_unique.indexOf(row[config[TARGET_NODE]].value) == -1) {
         nodes_unique.push(row[config[TARGET_NODE]].value);
-        if (groups_unique.indexOf(row[config[TARGET_GROUP]].value) == -1) {
-          groups_unique.push(row[config[TARGET_GROUP]].value);
-        }
         let nodeDim = dimensions.find((e) => e.name === config[TARGET_NODE]);
         let groupDim = dimensions.find((e) => e.name === config[TARGET_GROUP]);
         const newnode = {
@@ -407,9 +420,6 @@ const vis: ForceDirectedGraphVisualization = {
       done();
     }
 
-    var manybody = d3.forceManyBody();
-    //manybody.strength(-7)
-
     var func = {
       sqrt: (d) => Math.sqrt(d),
       cbrt: (d) => Math.cbrt(d),
@@ -417,276 +427,348 @@ const vis: ForceDirectedGraphVisualization = {
       log10: (d) => Math.log10(d),
     };
 
-    let highestNodeWeight = 1;
-    const getNodeWeight = (label) => {
-      const edges = links.filter(
-        (link) => link.source.id === label || link.target.id === label
-      );
-      const weight = edges.length ?? 1;
-      if (weight > highestNodeWeight) highestNodeWeight = weight;
-      return weight;
-    };
+    const renderGraph = () => {
+      const width = element.clientWidth;
+      const height = element.clientHeight + 20;
+      this.svg.selectAll("*").remove();
+      const svg = this.svg!.attr("width", "100%").attr("height", height);
 
-    const simulation = d3
-      .forceSimulation(nodes)
-      .force(
-        "link",
-        d3
-          .forceLink(links)
-          .distance((d) => {
-            const weight = func[config.edge_weight](d.value);
-            return linkDistance * weight - highestNodeWeight;
-          })
-          .id((d) => (d as any).id)
-      )
-      .force("charge", manybody)
-      .force("center", d3.forceCenter(width / 2, height / 2));
+      const simulation = d3
+        .forceSimulation(nodes)
+        .force(
+          "link",
+          d3
+            .forceLink(links)
+            .distance(linkDistance)
+            .id((d) => (d as any).id)
+        )
+        .force("charge", d3.forceManyBody())
+        .force("center", d3.forceCenter(width / 2, height / 2));
 
-    const toggleCrossfilter = (event, index) => {
-      const pageX = event.pageX ?? event.native.pageX;
-      const pageY = event.pageY ?? event.native.pageY;
-      LookerCharts.Utils.toggleCrossfilter({
-        row: data[index],
-        event: { pageX, pageY },
-      });
-    };
+      simulation
+        .force("center", d3.forceCenter(width / 2, height / 2))
+        .alpha(1)
+        .restart();
 
-    const openDrillMenu = (event, links) => {
-      const pageX = event.pageX ?? event.native.pageX;
-      const pageY = event.pageY ?? event.native.pageY;
-      LookerCharts.Utils.openDrillMenu({
-        event: { pageX, pageY },
-        links,
-      });
-    };
+      svg.attr("height", height);
 
-    const closeDrillMenu = () => {
-      LookerCharts.Utils.openDrillMenu({
-        event: {
-          pageX: Number.MAX_SAFE_INTEGER,
-          pageY: Number.MAX_SAFE_INTEGER,
-        },
-        links: [
-          {
-            label: "Open in new tab",
-            type: "url",
-            url: window.location.href,
+      svg
+        .selectAll("line")
+        .attr("x1", (d) => d.source.x)
+        .attr("y1", (d) => d.source.y)
+        .attr("x2", (d) => d.target.x)
+        .attr("y2", (d) => d.target.y);
+
+      svg
+        .selectAll("circle")
+        .attr("cx", (d) => d.x)
+        .attr("cy", (d) => d.y);
+
+      const toggleCrossfilter = (event, index) => {
+        const pageX = event.pageX ?? event.native.pageX;
+        const pageY = event.pageY ?? event.native.pageY;
+        LookerCharts.Utils.toggleCrossfilter({
+          row: data[index],
+          event: { pageX, pageY },
+        });
+      };
+
+      const openDrillMenu = (event, links) => {
+        const pageX = event.pageX ?? event.native.pageX;
+        const pageY = event.pageY ?? event.native.pageY;
+        LookerCharts.Utils.openDrillMenu({
+          event: { pageX, pageY },
+          links,
+        });
+      };
+
+      const closeDrillMenu = () => {
+        LookerCharts.Utils.openDrillMenu({
+          event: {
+            pageX: Number.MAX_SAFE_INTEGER,
+            pageY: Number.MAX_SAFE_INTEGER,
           },
-        ],
-      });
-    };
+          links: [
+            {
+              label: "Open in new tab",
+              type: "url",
+              url: window.location.href,
+            },
+          ],
+        });
+      };
 
-    const svg = this.svg!.attr("width", "100%").attr("height", height);
+      const link = svg
+        .append("g")
+        .attr("stroke", config.link_color)
+        .attr("stroke-opacity", 0.6)
+        .selectAll("line")
+        .data(links)
+        .enter()
+        .append("line")
+        .attr("value", (d) => d.value)
+        .attr("target", (d) => d.target.id)
+        .attr("source", (d) => d.source.id)
+        .attr("stroke-width", (d) => {
+          if (measure) {
+            return func[config.edge_weight](d.value);
+          }
+          return d.value;
+        })
+        .on("mouseover", function (d) {
+          d3.select(this).attr("stroke", "#FFA500");
+          if (config.tooltip) {
+            linkTooltip(d, d3.event, isDragging, measure, valFormat);
+          }
+        })
+        .on("mousemove", (d) => {
+          if (config.tooltip) {
+            updatePosition(d, d3.event, isDragging, "link");
+          }
+        })
+        .on("mouseleave", function () {
+          d3.select(this).attr("stroke", config.link_color);
+          hideTooltip();
+        });
 
-    const link = svg
-      .append("g")
-      .attr("stroke", config.link_color)
-      .attr("stroke-opacity", 0.6)
-      .selectAll("line")
-      .data(links)
-      .enter()
-      .append("line")
-      .attr("value", (d) => d.value)
-      .attr("target", (d) => d.target.id)
-      .attr("source", (d) => d.source.id)
-      .attr("stroke-width", (d) => {
-        if (measure) {
-          return func[config.edge_weight](d.value);
-        }
-        return d.value;
-      })
-      .on("mouseover", function (d) {
-        d3.select(this).attr("stroke", "#FFA500");
-        if (config.tooltip) {
-          linkTooltip(d, d3.event, isDragging, measure, valFormat);
-        }
-      })
-      .on("mousemove", (d) => {
-        if (config.tooltip) {
-          updatePosition(d, d3.event, isDragging, "link");
-        }
-      })
-      .on("mouseleave", function () {
-        d3.select(this).attr("stroke", config.link_color);
-        hideTooltip();
-      })
-      .on("click", function () {
-        const target = d3.event.target;
-        if (target.tagName !== "circle") closeDrillMenu();
-      });
-
-    element.onclick = function (event: any) {
-      if (event.target.nodeName !== "circle") closeDrillMenu();
-    };
-
-    var node = svg
-      .append("g")
-      .attr("class", "nodes")
-      .selectAll(".node")
-      .data(nodes)
-      .enter()
-      .append("g")
-      .attr("class", "node")
-      .call(drag(simulation));
-
-    node
-      .append("circle")
-      .attr("stroke", "#fff")
-      .attr("stroke-width", 1)
-      .attr("id", (d) => d.id)
-      .attr("r", (d) => {
-        const weight = getNodeWeight(d.id);
-        return radius * weight;
-      })
-      .attr("fill", (d) => color(d.group))
-      .on("mouseover", function (d) {
-        d3.select(this).attr("stroke-width", 1.5).attr("stroke", "#FFA500");
-        if (config.tooltip) {
-          nodeTooltip(d, d3.event, isDragging);
-        }
-        if (config.highlight_selection || config.labels === "on_hover") {
-          highlightNeighbors(
-            d,
-            d3.event,
-            isDragging,
-            config.labels === "on_hover",
-            config.highlight_selection
-          );
-        }
-      })
-      .on("mousemove", (d) => {
-        if (config.tooltip) {
-          updatePosition(d, d3.event, isDragging, "node");
-        }
-      })
-      .on("mouseleave mousedown", function () {
-        d3.select(this).attr("stroke-width", 1).attr("stroke", "#fff");
-        hideTooltip();
-        if (config.highlight_selection || config.labels === "on_hover") {
-          clearHighlight(config.labels === "on_hover");
-        }
-      })
-      .on("click", function (d) {
-        let nodeLinks: any[] = [];
+      const getEdgeLinks = (sourceValue: string, targetValue: string) => {
+        let edgeLinks: any[] = [];
         for (const node of data) {
           if (
-            node[config[SOURCE_NODE]].value === d.id ||
-            node[config[TARGET_NODE]].value === d.id
+            node[config[SOURCE_NODE]].value === sourceValue &&
+            node[config[TARGET_NODE]].value === targetValue
           )
-            nodeLinks = nodeLinks.concat(
+            edgeLinks = edgeLinks.concat(
               node[config[SOURCE_NODE]].links ?? [],
               node[config[TARGET_NODE]].links ?? []
             );
         }
-        if (details.crossfilterEnabled) toggleCrossfilter(d3.event, d.index);
-        else openDrillMenu(d3.event, nodeLinks);
-      })
-      .on("contextmenu", function (d) {
-        if (!details.crossfilterEnabled) return;
-        d3.event.preventDefault();
-        let nodeLinks: any[] = [];
-        for (const node of data) {
+        return edgeLinks.reduce((uniqueLinks, link) => {
           if (
-            node[config[SOURCE_NODE]].value === d.id ||
-            node[config[TARGET_NODE]].value === d.id
+            !uniqueLinks.find(
+              (_link) =>
+                _link.label === link.label &&
+                _link.url === link.url &&
+                _link.type === link.type
+            )
           )
-            nodeLinks = nodeLinks.concat(
-              node[config[SOURCE_NODE]].links ?? [],
-              node[config[TARGET_NODE]].links ?? []
-            );
-        }
-        openDrillMenu(d3.event, nodeLinks);
-      });
+            uniqueLinks.push(link);
+          return uniqueLinks;
+        }, []);
+      };
 
-    var labelTypes = [];
-    if (config.labelTypes && config.labelTypes.length) {
-      labelTypes = config.labelTypes.split(",").map((e) => e.trim());
-    }
-
-    if (config.labels && config.labelTypes && config.labelTypes.length) {
-      node
-        .append("text")
-        .attr("id", (d) => d.id)
-        .style("font-size", config.font_size)
-        .style("fill", config.font_color)
-        .attr("y", -1 * config.circle_radius - 3 + "px")
-        .style("text-anchor", "middle")
-        .style("font-weight", config.font_weight)
-        .style("font-family", config.font_family)
-        .text(function (d) {
-          if (labelTypes.indexOf(d.group) > -1) {
-            return d.id;
-          } else {
-            return null;
-          }
-        });
-    } else if (config.labels !== "none") {
-      node
-        .append("text")
-        .attr("id", (d) => d.id)
-        .style("font-size", config.font_size)
-        .style("fill", config.font_color)
-        .attr("y", -1 * config.circle_radius - 3 + "px")
-        .style("text-anchor", "middle")
-        .style("font-weight", config.font_weight)
-        .style("font-family", config.font_family)
-        .text(function (d) {
-          if (config.labels === "all" || config.labels === "on_hover") {
-            return d.id;
-          } else if (config.labels === "source_group") {
-            if (d.groupType === SOURCE) {
-              return d.id;
-            } else {
-              return "";
-            }
-          } else if (config.labels === "target_group") {
-            if (d.groupType === TARGET) {
-              return d.id;
-            } else {
-              return "";
-            }
-          }
-        });
-    }
-
-    if (config.labels === "on_hover") {
-      d3.selectAll("text").attr("opacity", 0);
-    }
-
-    const margin = radius * highestNodeWeight;
-    simulation.on("tick", () => {
       link
-        .attr("x1", (d) => {
-          const sourceX = isNaN(d.source.x)
-            ? width / 2
-            : Math.max(margin, Math.min(width - margin, d.source.x));
-          return sourceX;
+        .on("click", function (d) {
+          let edgeLinks: any[] = getEdgeLinks(d.source.id, d.target.id);
+          if (!edgeLinks.length) closeDrillMenu();
+          if (details.crossfilterEnabled) toggleCrossfilter(d3.event, d.index);
+          else openDrillMenu(d3.event, edgeLinks);
         })
-        .attr("y1", (d) => {
-          const sourceY = isNaN(d.source.y)
-            ? height / 2
-            : Math.max(margin, Math.min(height - margin, d.source.y));
-          return sourceY;
-        })
-        .attr("x2", (d) => {
-          const targetX = isNaN(d.target.x)
-            ? width / 2
-            : Math.max(margin, Math.min(width - margin, d.target.x));
-          return targetX;
-        })
-        .attr("y2", (d) => {
-          const targetY = isNaN(d.target.y)
-            ? height / 2
-            : Math.max(margin, Math.min(height - margin, d.target.y));
-          return targetY;
+        .on("contextmenu", function (d) {
+          if (!details.crossfilterEnabled) return;
+          d3.event.preventDefault();
+          let edgeLinks: any[] = getEdgeLinks(d.source.id, d.target.id);
+          if (!edgeLinks.length) closeDrillMenu();
+          openDrillMenu(d3.event, edgeLinks);
         });
 
-      node.attr("transform", function (d) {
-        d.x = Math.max(margin, Math.min(width - margin, d.x));
-        d.y = Math.max(margin, Math.min(height - margin, d.y));
-        return `translate(${d.x},${d.y})`;
+      element.onclick = function (event: any) {
+        if (
+          event.target.nodeName !== "circle" &&
+          event.target.nodeName !== "line"
+        )
+          closeDrillMenu();
+      };
+
+      var node = svg
+        .append("g")
+        .attr("class", "nodes")
+        .selectAll(".node")
+        .data(nodes)
+        .enter()
+        .append("g")
+        .attr("class", "node")
+        .call(drag(simulation));
+
+      node
+        .append("circle")
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 1)
+        .attr("id", (d) => d.id)
+        .attr("r", radius)
+        .attr("fill", (d) => config[`color_${d.group}`])
+        .on("mouseover", function (d) {
+          d3.select(this).attr("stroke-width", 1.5).attr("stroke", "#FFA500");
+          if (config.tooltip) nodeTooltip(d, d3.event, isDragging);
+          if (config.highlight_selection || config.labels === "on_hover") {
+            highlightNeighbors(
+              d,
+              d3.event,
+              isDragging,
+              config.labels === "on_hover",
+              config.highlight_selection
+            );
+          }
+        })
+        .on("mousemove", (d) => {
+          if (config.tooltip) updatePosition(d, d3.event, isDragging, "node");
+        })
+        .on("mouseleave mousedown", function () {
+          d3.select(this).attr("stroke-width", 1).attr("stroke", "#fff");
+          hideTooltip();
+          if (config.highlight_selection || config.labels === "on_hover") {
+            clearHighlight(config.labels === "on_hover");
+          }
+        });
+
+      const getNodeLinks = (value: string) => {
+        let nodeLinks: any[] = [];
+        for (const node of data) {
+          if (
+            node[config[SOURCE_NODE]].value === value ||
+            node[config[TARGET_NODE]].value === value
+          )
+            nodeLinks = nodeLinks.concat(
+              node[config[SOURCE_NODE]].links ?? [],
+              node[config[TARGET_NODE]].links ?? []
+            );
+        }
+        return nodeLinks.reduce((uniqueLinks, link) => {
+          if (
+            !uniqueLinks.find(
+              (_link) =>
+                _link.label === link.label &&
+                _link.url === link.url &&
+                _link.type === link.type
+            )
+          )
+            uniqueLinks.push(link);
+          return uniqueLinks;
+        }, []);
+      };
+
+      node
+        .on("click", function (d) {
+          let nodeLinks: any[] = getNodeLinks(d.id);
+          if (!nodeLinks.length) closeDrillMenu();
+          if (details.crossfilterEnabled) toggleCrossfilter(d3.event, d.index);
+          else openDrillMenu(d3.event, nodeLinks);
+        })
+        .on("contextmenu", function (d) {
+          if (!details.crossfilterEnabled) return;
+          d3.event.preventDefault();
+          let nodeLinks: any[] = getNodeLinks(d.id);
+          if (!nodeLinks.length) closeDrillMenu();
+          openDrillMenu(d3.event, nodeLinks);
+        });
+
+      var labelTypes = [];
+      if (config.labelTypes && config.labelTypes.length) {
+        labelTypes = config.labelTypes.split(",").map((e) => e.trim());
+      }
+
+      if (config.labels && config.labelTypes && config.labelTypes.length) {
+        node
+          .append("text")
+          .attr("id", (d) => d.id)
+          .style("font-size", config.font_size)
+          .style("fill", config.font_color)
+          .attr("y", -1 * config.circle_radius - 3 + "px")
+          .style("text-anchor", "middle")
+          .style("font-weight", config.font_weight)
+          .style("font-family", config.font_family)
+          .text(function (d) {
+            if (labelTypes.indexOf(d.group) > -1) {
+              return d.id;
+            } else {
+              return null;
+            }
+          });
+      } else if (config.labels !== "none") {
+        node
+          .append("text")
+          .attr("id", (d) => d.id)
+          .style("font-size", config.font_size)
+          .style("fill", config.font_color)
+          .attr("y", -1 * config.circle_radius - 3 + "px")
+          .style("text-anchor", "middle")
+          .style("font-weight", config.font_weight)
+          .style("font-family", config.font_family)
+          .text(function (d) {
+            if (config.labels === "all" || config.labels === "on_hover") {
+              return d.id;
+            } else if (config.labels === "source_group") {
+              if (d.groupType === SOURCE) {
+                return d.id;
+              } else {
+                return "";
+              }
+            } else if (config.labels === "target_group") {
+              if (d.groupType === TARGET) {
+                return d.id;
+              } else {
+                return "";
+              }
+            }
+          });
+      }
+
+      if (config.labels === "on_hover") {
+        d3.selectAll("text").attr("opacity", 0);
+      }
+
+      simulation.on("tick", () => {
+        link
+          .attr("x1", (d) => {
+            if (isNaN(d.source.x)) {
+              return 0;
+            } else {
+              return d.source.x;
+            }
+          })
+          .attr("y1", (d) => {
+            if (isNaN(d.source.y)) {
+              return 0;
+            } else {
+              return d.source.y;
+            }
+          })
+          .attr("x2", (d) => {
+            if (isNaN(d.target.x)) {
+              return 0;
+            } else {
+              return d.target.x;
+            }
+          })
+          .attr("y2", (d) => {
+            if (isNaN(d.target.y)) {
+              return 0;
+            } else {
+              return d.target.y;
+            }
+          });
+
+        node
+          .attr(
+            "cx",
+            (d) => (d.x = Math.max(radius, Math.min(width - radius, d.x)))
+          )
+          .attr(
+            "cy",
+            (d) => (d.y = Math.max(radius, Math.min(height - radius, d.y)))
+          )
+          .attr("transform", function (d) {
+            if (isNaN(d.x)) {
+              return "";
+            } else {
+              return "translate(" + d.x + "," + d.y + ")";
+            }
+          });
       });
-    });
+    };
+
+    renderGraph();
+    window.addEventListener("resize", renderGraph);
     done();
   },
 };

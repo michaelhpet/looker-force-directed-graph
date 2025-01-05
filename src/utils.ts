@@ -1,6 +1,11 @@
 import * as d3 from "d3";
 
-import { VisConfig, VisQueryResponse, VisualizationDefinition } from "./types";
+import {
+  VisConfig,
+  VisData,
+  VisQueryResponse,
+  VisualizationDefinition,
+} from "./types";
 
 export const formatType = (valueFormat: string) => {
   if (!valueFormat) return undefined;
