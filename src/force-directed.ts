@@ -293,8 +293,6 @@ const vis: ForceDirectedGraphVisualization = {
           order: 10 + i,
           default: dimensions[i].name,
         };
-        // TODO: remove this
-        // config[g] = newOptions[g].default;
       });
       groups.forEach((group, i) => {
         newOptions[`color_${group}`] = {
@@ -305,8 +303,6 @@ const vis: ForceDirectedGraphVisualization = {
           display_size: "half",
           default: DEAFULT_COLORS[i % groups.length],
         };
-        // TODO: remove this
-        // config[`color_${group}`] = newOptions[`color_${group}`].default;
       });
       this.trigger("registerOptions", newOptions);
     };
