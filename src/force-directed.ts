@@ -219,6 +219,7 @@ const vis: ForceDirectedGraphVisualization = {
   },
   // Render in response to the data or settings changing
   updateAsync(data, element, config, queryResponse, details, done) {
+    console.log({data, element, config, queryResponse, details})
     this.clearErrors();
     if (
       !handleErrors(this, queryResponse, {
@@ -265,7 +266,7 @@ const vis: ForceDirectedGraphVisualization = {
       "Target groups",
     ];
 
-    const DEAFULT_COLORS = [
+    const DEFAULT_COLORS = [
       "#1f77b4",
       "#ff7f0e",
       "#2ca02c",
@@ -301,9 +302,10 @@ const vis: ForceDirectedGraphVisualization = {
           type: "string",
           display: "color",
           display_size: "half",
-          default: DEAFULT_COLORS[i % groups.length],
+          default: DEFAULT_COLORS[i % DEFAULT_COLORS.length],
         };
       });
+      console.log('newOptions', newOptions);
       this.trigger("registerOptions", newOptions);
     };
 
